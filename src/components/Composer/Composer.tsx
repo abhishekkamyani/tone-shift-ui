@@ -1,24 +1,76 @@
 import { Send } from 'lucide-react';
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { cn } from '@/lib/utils';
 import { ComposerSelect } from './ComposerSelect';
 import { FormatSelect } from './FormatSelect';
 import { VoiceButton } from './VoiceButton';
 import { useAudioRecorder } from '@/hooks/useAudioRecorder';
 import type { AiTone, AiFormat } from '@/lib/mockAi';
+import { useMutation } from '@tanstack/react-query';
+import { transcribeVoiceNote } from '@/lib/aiApis';
+import { toast } from 'sonner';
 
 interface ComposerProps {
   onSend: (text: string, tone: AiTone, format: AiFormat) => void;
   disabled?: boolean;
 }
 
+// Helper function to convert Blob to Base64
+const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      // We only want the raw Base64 data, so we strip the data:audio prefix
+      const base64Data = base64String.split(',')[1];
+      resolve(base64Data);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
 export function Composer({ onSend, disabled = false }: ComposerProps) {
   const [text, setText] = useState('');
   const [tone, setTone] = useState<AiTone>('Professional');
   const [format, setFormat] = useState<AiFormat>('Email');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { isRecording, recordingTime, startRecording, stopRecording, error } = useAudioRecorder();
+  // const { isRecording, recordingTime, startRecording, stopRecording, error } = useAudioRecorder();
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
+  // --- Timer Logic for VoiceButton ---
+  useEffect(() => {
+    let interval;
+    if (isRecording) {
+      interval = setInterval(() => {
+        setRecordingSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setRecordingSeconds(0);
+    }
+    return () => clearInterval(interval);
+  }, [isRecording]);
+
+  const formatTime = (totalSeconds: number) => {
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // --- TanStack Mutation for Transcription ---
+  const transcribeMutation = useMutation({
+    mutationFn: transcribeVoiceNote,
+    onSuccess: (data) => {
+      setText((prev) => (prev ? `${prev} ${data.text}` : data.text));
+      toast.success('Voice note transcribed!');
+    },
+    onError: () => {
+      toast.error('Failed to transcribe audio.');
+    }
+  });
   const handleSend = () => {
     const trimmed = text.trim();
     if (!trimmed || disabled) return;
@@ -43,20 +95,54 @@ export function Composer({ onSend, disabled = false }: ComposerProps) {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   };
 
-  const handleVoiceStop = async () => {
-    const transcript = await stopRecording();
-    if (transcript) {
-      onSend(transcript, tone, format);
+  const handleStartRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      chunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(chunksRef.current, { type: mediaRecorder.mimeType });
+        const base64Audio = await blobToBase64(audioBlob);
+
+        transcribeMutation.mutate({
+          audioBase64: base64Audio,
+          mimeType: audioBlob.type
+        });
+
+        stream.getTracks().forEach(track => track.stop());
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Microphone error:', err);
+      toast.error('Microphone access denied or unavailable.');
     }
   };
 
+  const handleStopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+    }
+  };
+
+
+  const isTranscribing = transcribeMutation.isPending;
+
   return (
     <div className="border-t border-border bg-background-surface px-4 py-3">
-      {error && (
+      {/* {error && (
         <div className="mb-2 text-xs text-danger-500 bg-danger-50 dark:bg-danger-900/20 px-3 py-1.5 rounded-lg">
           {error}
         </div>
-      )}
+      )} */}
 
       <div
         className={cn(
@@ -104,10 +190,10 @@ export function Composer({ onSend, disabled = false }: ComposerProps) {
           <div className="flex items-center gap-2 flex-shrink-0">
             <VoiceButton
               isRecording={isRecording}
-              recordingTime={recordingTime}
-              onStart={startRecording}
-              onStop={handleVoiceStop}
-              disabled={disabled}
+              recordingTime={formatTime(recordingSeconds)}
+              onStart={handleStartRecording}
+              onStop={handleStopRecording}
+              disabled={disabled || isTranscribing}
             />
 
             <button

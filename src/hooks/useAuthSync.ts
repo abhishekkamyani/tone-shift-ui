@@ -1,4 +1,5 @@
 // src/hooks/useAuthSync.ts
+import { setTokenGetter } from '@/lib/aiApis';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useEffect, useState } from 'react';
 
@@ -12,7 +13,7 @@ export const useAuthSync = () => {
         try {
           const token = await getAccessTokenSilently();
           
-          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/users/sync`, {
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/api/v1/users/sync`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -26,6 +27,7 @@ export const useAuthSync = () => {
           });
 
           const data = await response.json();
+          setTokenGetter(getAccessTokenSilently);
           setDbUser(data);
         } catch (error) {
           console.error("Failed to sync user with backend:", error);

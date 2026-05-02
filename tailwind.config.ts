@@ -5,12 +5,14 @@ const config: Config = {
   content: [
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',
+    './app/**/*.{js,ts,jsx,tsx}',      // Add this if using Next.js App Router
+    './components/**/*.{js,ts,jsx,tsx}', // Add this to cover all components
   ],
   theme: {
     extend: {
       colors: {
         primary: {
-          50:  'var(--color-primary-50)',
+          50: 'var(--color-primary-50)',
           100: 'var(--color-primary-100)',
           200: 'var(--color-primary-200)',
           300: 'var(--color-primary-300)',
@@ -23,7 +25,7 @@ const config: Config = {
           DEFAULT: 'var(--color-primary-500)',
         },
         secondary: {
-          50:  'var(--color-secondary-50)',
+          50: 'var(--color-secondary-50)',
           100: 'var(--color-secondary-100)',
           200: 'var(--color-secondary-200)',
           300: 'var(--color-secondary-300)',
@@ -36,7 +38,7 @@ const config: Config = {
           DEFAULT: 'var(--color-secondary-500)',
         },
         success: {
-          50:  'var(--color-success-50)',
+          50: 'var(--color-success-50)',
           100: 'var(--color-success-100)',
           200: 'var(--color-success-200)',
           300: 'var(--color-success-300)',
@@ -49,7 +51,7 @@ const config: Config = {
           DEFAULT: 'var(--color-success-500)',
         },
         danger: {
-          50:  'var(--color-danger-50)',
+          50: 'var(--color-danger-50)',
           100: 'var(--color-danger-100)',
           200: 'var(--color-danger-200)',
           300: 'var(--color-danger-300)',
@@ -62,7 +64,7 @@ const config: Config = {
           DEFAULT: 'var(--color-danger-500)',
         },
         warning: {
-          50:  'var(--color-warning-50)',
+          50: 'var(--color-warning-50)',
           100: 'var(--color-warning-100)',
           200: 'var(--color-warning-200)',
           300: 'var(--color-warning-300)',
@@ -119,7 +121,9 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/typography'),
+  ],
 };
 
 export default config;

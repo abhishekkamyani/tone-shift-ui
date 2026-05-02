@@ -1,10 +1,12 @@
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { useMutation } from '@tanstack/react-query'; 
+import { shiftTextTone } from '@/lib/aiApis'; 
 import { Sidebar, type ChatSession } from '@/components/Sidebar/Sidebar';
 import { Composer } from '@/components/Composer/Composer';
 import { ChatArea } from './components/ChatArea';
 import { DashboardHeader } from './components/DashboardHeader';
-import { generateAiResponse, type AiTone, type AiFormat } from '@/lib/mockAi';
+import { type AiTone, type AiFormat } from '@/lib/mockAi'; 
 import { generateId } from '@/lib/utils';
 import { useMobile } from '@/hooks/useMobile';
 import type { Message } from '@/components/ChatMessage/ChatMessage';
@@ -24,12 +26,12 @@ function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
   const { dbUser } = useAuthSync();
 
-
   const [conversations, setConversations] = useState<ConversationState[]>([
     { id: INITIAL_SESSION_ID, title: 'New Chat', messages: [] },
   ]);
   const [activeConvId, setActiveConvId] = useState<string>(INITIAL_SESSION_ID);
-  const [isTyping, setIsTyping] = useState(false);
+
+  // We can remove isTyping state because React Query handles 'isPending' for us!
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [activeTone, setActiveTone] = useState<AiTone>('Professional');
   const [activeFormat, setActiveFormat] = useState<AiFormat>('Email');
@@ -39,6 +41,16 @@ function DashboardPage() {
   const updateConversation = useCallback((id: string, updater: (prev: ConversationState) => ConversationState) => {
     setConversations(prev => prev.map(c => c.id === id ? updater(c) : c));
   }, []);
+
+  // --- REACT QUERY MUTATION ---
+  const shiftToneMutation = useMutation({
+    mutationFn: shiftTextTone,
+    onError: (error) => {
+      console.error(error);
+      setStreamingMessageId(null);
+      toast.error('Failed to get a response from the server. Please try again.');
+    }
+  });
 
   const handleSend = useCallback(async (text: string, tone: AiTone, format: AiFormat) => {
     setActiveTone(tone);
@@ -51,61 +63,53 @@ function DashboardPage() {
       timestamp: new Date(),
     };
 
-    // Append user message
+    // 1. Append ONLY the user message. 
+    // React Query's 'isPending' will automatically show the '...' typing indicator.
     updateConversation(activeConvId, conv => ({
       ...conv,
       title: conv.messages.length === 0 ? text.slice(0, 40) + (text.length > 40 ? '…' : '') : conv.title,
       messages: [...conv.messages, userMsg],
     }));
 
-    setIsTyping(true);
+    // 2. Call the backend API
+    shiftToneMutation.mutate(
+      { originalText: text, targetTone: tone, format },
+      {
+        onSuccess: async (data) => {
+          const aiMsgId = generateId();
 
-    try {
-      const aiMsgId = generateId();
+          // 3. The API responded! Now we inject the AI message bubble to start streaming
+          updateConversation(activeConvId, conv => ({
+            ...conv,
+            messages: [...conv.messages, { id: aiMsgId, role: 'ai', content: '', timestamp: new Date() }],
+          }));
 
-      // Add placeholder AI message for streaming
-      const placeholderMsg: Message = {
-        id: aiMsgId,
-        role: 'ai',
-        content: '',
-        timestamp: new Date(),
-      };
+          // 4. Simulate streaming the response for that premium UI feel
+          const words = data.shiftedText.split(' ');
+          let currentText = '';
 
-      updateConversation(activeConvId, conv => ({
-        ...conv,
-        messages: [...conv.messages, userMsg, placeholderMsg],
-      }));
+          for (let i = 0; i < words.length; i++) {
+            // Ensure we don't add a trailing space on the very last word
+            currentText += words[i] + (i === words.length - 1 ? '' : ' ');
 
-      setIsTyping(false);
-      setStreamingMessageId(aiMsgId);
-
-      await generateAiResponse(
-        text,
-        tone,
-        (chunk) => {
-          setConversations(prev =>
-            prev.map(c =>
-              c.id === activeConvId
-                ? {
-                  ...c,
-                  messages: c.messages.map(m =>
-                    m.id === aiMsgId ? { ...m, content: chunk } : m
-                  ),
-                }
-                : c
-            )
-          );
-        },
-        format
-      );
-
-      setStreamingMessageId(null);
-    } catch {
-      setIsTyping(false);
-      setStreamingMessageId(null);
-      toast.error('Failed to get a response. Please try again.');
-    }
-  }, [activeConvId, updateConversation]);
+            setConversations(prev =>
+              prev.map(c =>
+                c.id === activeConvId
+                  ? {
+                    ...c,
+                    messages: c.messages.map(m =>
+                      m.id === aiMsgId ? { ...m, content: currentText } : m
+                    ),
+                  }
+                  : c
+              )
+            );
+            await new Promise(resolve => setTimeout(resolve, 1));
+          }
+        }
+      }
+    );
+  }, [activeConvId, updateConversation, shiftToneMutation]);
 
   const handleNewChat = useCallback(() => {
     const newId = generateId();
@@ -137,7 +141,6 @@ function DashboardPage() {
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
-      {/* Sidebar */}
       <Sidebar
         sessions={sessions}
         activeSessionId={activeConvId}
@@ -149,7 +152,6 @@ function DashboardPage() {
         userEmail="user@example.com"
       />
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 h-full">
         <DashboardHeader
           onMenuToggle={() => setSidebarOpen(prev => !prev)}
@@ -160,14 +162,14 @@ function DashboardPage() {
 
         <ChatArea
           messages={activeConv?.messages ?? []}
-          isTyping={isTyping}
+          isTyping={shiftToneMutation.isPending} // Using React Query's built-in state!
           streamingMessageId={streamingMessageId}
           className="flex-1"
         />
 
         <Composer
           onSend={handleSend}
-          disabled={isTyping || streamingMessageId !== null}
+          disabled={shiftToneMutation.isPending || streamingMessageId !== null}
         />
       </div>
     </div>
