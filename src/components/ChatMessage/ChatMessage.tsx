@@ -10,6 +10,7 @@ export interface Message {
   role: 'user' | 'ai';
   content: string;
   timestamp: Date;
+  chatId?: string;
 }
 
 interface ChatMessageProps {

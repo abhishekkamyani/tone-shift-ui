@@ -8,13 +8,30 @@ export interface ShiftToneResponse {
     originalText: string;
     targetTone: string;
     shiftedText: string;
+    chatId?: string;
 }
 
-// Define the shape of the request payload
+export interface ChatSession {
+    _id: string;
+    title: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ChatMessage {
+    _id: string;
+    chatId: string;
+    role: 'user' | 'ai';
+    content: string;
+    createdAt: string;
+}
+
+// Update your payload to include optional chatId
 export interface ShiftTonePayload {
     originalText: string;
     targetTone: AiTone;
     format: AiFormat;
+    chatId?: string;
 }
 
 export interface TranscribePayload {
@@ -37,7 +54,7 @@ const apiClient = axios.create({
 
 // Create a variable to hold the token-fetching function
 let getAuthToken: (() => Promise<string | undefined>) | null = null;
-
+console.log("getAuthToken", getAuthToken)
 // Export a function so your React app can give Axios the Auth0 getter
 export const setTokenGetter = (getter: () => Promise<string | undefined>) => {
     getAuthToken = getter;
@@ -46,10 +63,12 @@ export const setTokenGetter = (getter: () => Promise<string | undefined>) => {
 // Add an interceptor to automatically attach the token before EVERY request
 apiClient.interceptors.request.use(
     async (config) => {
+        console.log("==getAuthToken==", getAuthToken)
         if (getAuthToken) {
             try {
                 // Fetch the token (Auth0 handles caching and refreshing automatically!)
                 const token = await getAuthToken();
+                console.log("token", token)
                 if (token) {
                     config.headers.Authorization = `Bearer ${token}`;
                 }
@@ -63,6 +82,26 @@ apiClient.interceptors.request.use(
         return Promise.reject(error);
     }
 );
+
+export const chatApi = {
+    // Get list of chats for Sidebar
+    getChats: async (): Promise<ChatSession[]> => {
+        const response = await apiClient.get('/chats');
+        return response.data;
+    },
+
+    // Get messages for a specific chat
+    getMessages: async (chatId: string): Promise<ChatMessage[]> => {
+        const response = await apiClient.get(`/chats/${chatId}/messages`);
+        return response.data;
+    },
+
+    // Manually create a new chat (e.g. clicking "New Chat" button)
+    createChat: async (): Promise<ChatSession> => {
+        const response = await apiClient.post('/chats');
+        return response.data;
+    }
+};
 
 // The dedicated API function
 export const shiftTextTone = async (payload: ShiftTonePayload): Promise<ShiftToneResponse> => {

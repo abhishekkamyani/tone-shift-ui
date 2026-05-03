@@ -8,6 +8,10 @@ export const useAuthSync = () => {
   const [dbUser, setDbUser] = useState(null);
 
   useEffect(() => {
+    // 🚨 FIX 1 & 2 ARE HERE: 
+    // It must be at the very top of useEffect, and it MUST be an arrow function!
+    setTokenGetter(() => getAccessTokenSilently());
+
     const syncUser = async () => {
       if (isAuthenticated && user) {
         try {
@@ -27,7 +31,7 @@ export const useAuthSync = () => {
           });
 
           const data = await response.json();
-          setTokenGetter(getAccessTokenSilently);
+          // Notice setTokenGetter is NO LONGER down here
           setDbUser(data);
         } catch (error) {
           console.error("Failed to sync user with backend:", error);

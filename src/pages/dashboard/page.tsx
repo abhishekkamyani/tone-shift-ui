@@ -1,155 +1,186 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
-import { useMutation } from '@tanstack/react-query'; 
-import { shiftTextTone } from '@/lib/aiApis'; 
-import { Sidebar, type ChatSession } from '@/components/Sidebar/Sidebar';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { chatApi, shiftTextTone } from '@/lib/aiApis';
+import { Sidebar } from '@/components/Sidebar/Sidebar';
 import { Composer } from '@/components/Composer/Composer';
 import { ChatArea } from './components/ChatArea';
 import { DashboardHeader } from './components/DashboardHeader';
-import { type AiTone, type AiFormat } from '@/lib/mockAi'; 
-import { generateId } from '@/lib/utils';
+import { type AiTone, type AiFormat } from '@/lib/mockAi';
 import { useMobile } from '@/hooks/useMobile';
 import type { Message } from '@/components/ChatMessage/ChatMessage';
 import { useAuthSync } from '@/hooks/useAuthSync';
 import { withAuthenticationRequired } from '@auth0/auth0-react';
 
-interface ConversationState {
-  id: string;
-  title: string;
-  messages: Message[];
-}
-
-const INITIAL_SESSION_ID = generateId();
-
 function DashboardPage() {
   const isMobile = useMobile();
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
   const { dbUser } = useAuthSync();
+  const queryClient = useQueryClient();
 
-  const [conversations, setConversations] = useState<ConversationState[]>([
-    { id: INITIAL_SESSION_ID, title: 'New Chat', messages: [] },
-  ]);
-  const [activeConvId, setActiveConvId] = useState<string>(INITIAL_SESSION_ID);
-
-  // We can remove isTyping state because React Query handles 'isPending' for us!
-  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+  // --- 1. CORE STATE ---
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [activeTone, setActiveTone] = useState<AiTone>('Professional');
   const [activeFormat, setActiveFormat] = useState<AiFormat>('Email');
+  const [interactionId, setInteractionId] = useState<string>('');
 
-  const activeConv = conversations.find(c => c.id === activeConvId) ?? conversations[0];
+  // --- 2. OPTIMISTIC/STREAMING STATE ---
+  // Instead of a complex array, we just hold the "current interaction" in memory 
+  // until it finishes saving to the database.
+  const [pendingUserText, setPendingUserText] = useState<string | null>(null);
+  const [streamingAiText, setStreamingAiText] = useState<string>('');
+  const [isStreaming, setIsStreaming] = useState(false);
 
-  const updateConversation = useCallback((id: string, updater: (prev: ConversationState) => ConversationState) => {
-    setConversations(prev => prev.map(c => c.id === id ? updater(c) : c));
-  }, []);
 
-  // --- REACT QUERY MUTATION ---
+  // MUTATIONS & HANDLERS ---
   const shiftToneMutation = useMutation({
     mutationFn: shiftTextTone,
-    onError: (error) => {
-      console.error(error);
-      setStreamingMessageId(null);
-      toast.error('Failed to get a response from the server. Please try again.');
-    }
   });
 
+  const { data: chats = [] } = useQuery({
+    queryKey: ['chats'],
+    queryFn: chatApi.getChats,
+    enabled: !!dbUser,
+  });
+
+  const { data: backendMessages = [] } = useQuery({
+    queryKey: ['messages', activeChatId],
+    queryFn: () => chatApi.getMessages(activeChatId!),
+    enabled: !!activeChatId && !shiftToneMutation.isPending && !isStreaming,
+    staleTime: Infinity,
+  });
+
+
   const handleSend = useCallback(async (text: string, tone: AiTone, format: AiFormat) => {
+    // 1. Generate a unique ID for this specific message round
+    const currentInteractionId = Date.now().toString();
+    setInteractionId(currentInteractionId);
+
     setActiveTone(tone);
     setActiveFormat(format);
+    setPendingUserText(text);
+    setStreamingAiText('');
 
-    const userMsg: Message = {
-      id: generateId(),
-      role: 'user',
-      content: text,
-      timestamp: new Date(),
-    };
-
-    // 1. Append ONLY the user message. 
-    // React Query's 'isPending' will automatically show the '...' typing indicator.
-    updateConversation(activeConvId, conv => ({
-      ...conv,
-      title: conv.messages.length === 0 ? text.slice(0, 40) + (text.length > 40 ? '…' : '') : conv.title,
-      messages: [...conv.messages, userMsg],
-    }));
-
-    // 2. Call the backend API
     shiftToneMutation.mutate(
-      { originalText: text, targetTone: tone, format },
+      { originalText: text, targetTone: tone, format, chatId: activeChatId || undefined },
       {
         onSuccess: async (data) => {
-          const aiMsgId = generateId();
+          const currentChatId = data.chatId || activeChatId;
+          if (!activeChatId && currentChatId) {
+            setActiveChatId(currentChatId);
+          }
 
-          // 3. The API responded! Now we inject the AI message bubble to start streaming
-          updateConversation(activeConvId, conv => ({
-            ...conv,
-            messages: [...conv.messages, { id: aiMsgId, role: 'ai', content: '', timestamp: new Date() }],
-          }));
+          queryClient.invalidateQueries({ queryKey: ['chats'] });
+          setIsStreaming(true);
 
-          // 4. Simulate streaming the response for that premium UI feel
           const words = data.shiftedText.split(' ');
           let currentText = '';
 
           for (let i = 0; i < words.length; i++) {
-            // Ensure we don't add a trailing space on the very last word
             currentText += words[i] + (i === words.length - 1 ? '' : ' ');
-
-            setConversations(prev =>
-              prev.map(c =>
-                c.id === activeConvId
-                  ? {
-                    ...c,
-                    messages: c.messages.map(m =>
-                      m.id === aiMsgId ? { ...m, content: currentText } : m
-                    ),
-                  }
-                  : c
-              )
-            );
-            await new Promise(resolve => setTimeout(resolve, 1));
+            setStreamingAiText(currentText);
+            await new Promise(resolve => setTimeout(resolve, 30));
           }
+
+          // 2. Inject into cache using the EXACT same IDs as displayMessages!
+          queryClient.setQueryData(['messages', currentChatId], (old: any) => {
+            const previousMessages = old || [];
+            return [
+              ...previousMessages,
+              {
+                _id: `user-${currentInteractionId}`, // <-- Perfectly matches!
+                chatId: currentChatId,
+                role: 'user',
+                content: text,
+                createdAt: new Date().toISOString()
+              },
+              {
+                _id: `ai-${currentInteractionId}`,   // <-- Perfectly matches!
+                chatId: currentChatId,
+                role: 'ai',
+                content: data.shiftedText,
+                createdAt: new Date().toISOString()
+              }
+            ];
+          });
+
+          // 3. Clear streaming state. 
+          setIsStreaming(false);
+          setPendingUserText(null);
+          setStreamingAiText('');
+
+          // 🚨 NOTICE: We REMOVED queryClient.invalidateQueries!
+          // We trust our cache now. No background fetch means no ID swapping, which means zero flickering!
+        },
+        onError: () => {
+          toast.error("Failed to process message.");
+          setPendingUserText(null);
         }
       }
     );
-  }, [activeConvId, updateConversation, shiftToneMutation]);
+  }, [activeChatId, shiftToneMutation, queryClient]);
 
-  const handleNewChat = useCallback(() => {
-    const newId = generateId();
-    setConversations(prev => [
-      { id: newId, title: 'New Chat', messages: [] },
-      ...prev,
-    ]);
-    setActiveConvId(newId);
+  const handleSelectChat = (id: string) => {
+    setActiveChatId(id);
+    setPendingUserText(null); // Clear any streaming text if they switch chats fast
+    setStreamingAiText('');
     if (isMobile) setSidebarOpen(false);
-  }, [isMobile]);
-
-  const handleLogout = () => {
-    toast.success('Logged out successfully');
   };
 
-  const sessions: ChatSession[] = conversations.map(c => ({
-    id: c.id,
-    title: c.title,
-    preview: c.messages.length > 0
-      ? c.messages[c.messages.length - 1].content.slice(0, 50) + '…'
-      : 'No messages yet',
-    timestamp: c.messages.length > 0
-      ? c.messages[c.messages.length - 1].timestamp
-      : new Date(),
-    active: c.id === activeConvId,
-  }));
+  const handleNewChat = () => {
+    setActiveChatId(null);
+    setPendingUserText(null);
+    setStreamingAiText('');
+    if (isMobile) setSidebarOpen(false);
+  };
 
-  if (!dbUser) return <div>Loading your profile...</div>;
+  // --- 5. UI MAPPERS ---
+
+  // Combine real database messages with the current pending/streaming interaction
+  const displayMessages: Message[] = useMemo(() => {
+    const messages = backendMessages.map(m => ({
+      id: m._id,
+      role: m.role as 'user' | 'ai',
+      content: m.content,
+      timestamp: new Date(m.createdAt),
+      chatId: m.chatId
+    }));
+
+    if (pendingUserText) {
+      // 🚨 USE interactionId HERE
+      messages.push({ id: `user-${interactionId}`, role: 'user', content: pendingUserText, timestamp: new Date() });
+
+      if (isStreaming) {
+        // 🚨 AND HERE
+        messages.push({ id: `ai-${interactionId}`, role: 'ai', content: streamingAiText, timestamp: new Date() });
+      }
+    }
+    return messages;
+  }, [backendMessages, pendingUserText, isStreaming, streamingAiText, interactionId]);
+
+  const activeChat = chats.find(c => c._id === activeChatId);
+
+  const sidebarSessions = useMemo(() => chats.map(chat => ({
+    id: chat._id,
+    title: chat.title,
+    preview: "Click to view conversation",
+    timestamp: new Date(chat.createdAt),
+    active: chat._id === activeChatId
+  })), [chats, activeChatId]);
+
+  if (!dbUser) return <div className="flex h-screen items-center justify-center">Loading your profile...</div>;
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       <Sidebar
-        sessions={sessions}
-        activeSessionId={activeConvId}
+        sessions={sidebarSessions}
+        activeSessionId={activeChatId}
         onNewChat={handleNewChat}
-        onSelectSession={setActiveConvId}
-        onLogout={handleLogout}
+        onSelectSession={handleSelectChat}
+        onLogout={() => toast.success('Logged out successfully')}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        userEmail="user@example.com"
+        userEmail={dbUser.email || "User"}
       />
 
       <div className="flex-1 flex flex-col min-w-0 h-full">
@@ -157,19 +188,20 @@ function DashboardPage() {
           onMenuToggle={() => setSidebarOpen(prev => !prev)}
           activeTone={activeTone}
           activeFormat={activeFormat}
-          chatTitle={activeConv?.title ?? 'New Chat'}
+          chatTitle={activeChat?.title ?? 'New Chat'}
         />
 
         <ChatArea
-          messages={activeConv?.messages ?? []}
-          isTyping={shiftToneMutation.isPending} // Using React Query's built-in state!
-          streamingMessageId={streamingMessageId}
+          messages={displayMessages}
+          // Only show typing indicator when waiting for API, hide it once streaming starts
+          isTyping={shiftToneMutation.isPending}
+          streamingMessageId={isStreaming ? 'temp-ai' : null}
           className="flex-1"
         />
 
         <Composer
           onSend={handleSend}
-          disabled={shiftToneMutation.isPending || streamingMessageId !== null}
+          disabled={shiftToneMutation.isPending || isStreaming}
         />
       </div>
     </div>

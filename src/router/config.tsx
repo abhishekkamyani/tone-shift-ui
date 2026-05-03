@@ -13,6 +13,10 @@ const routes: RouteObject[] = [
     element: <DashboardPage />,
   },
   {
+    path: '/dashboard/:chatId',
+    element: <DashboardPage />,
+  },
+  {
     path: '*',
     element: <NotFound />,
   },
