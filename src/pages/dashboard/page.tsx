@@ -231,7 +231,7 @@ function DashboardPage() {
 
         <Composer
           onSend={handleSend}
-          disabled={shiftToneMutation.isPending}
+          disabled={shiftToneMutation.isPending || isStreaming}
         />
       </div>
     </div>

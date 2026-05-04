@@ -84,7 +84,10 @@ export function Composer({ onSend, disabled = false }: ComposerProps) {
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      // Block submission if AI is processing, or if user is recording
+      if (text.trim() && !disabled && !isRecording && !isTranscribing) {
+        handleSend();
+      }
     }
   };
 
@@ -155,21 +158,26 @@ export function Composer({ onSend, disabled = false }: ComposerProps) {
         <textarea
           ref={textareaRef}
           value={text}
-          onChange={e => setText(e.target.value)}
+          onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          onInput={handleInput}
-          disabled={disabled || isRecording}
+          //  Disable the input field based on active states
+          disabled={disabled || isRecording || isTranscribing}
+          // Update placeholder to communicate what's happening
           placeholder={
-            isRecording
-              ? 'Recording… press stop when done'
-              : 'Message ToneShift… (Enter to send, Shift+Enter for newline)'
+            isRecording ? "Recording voice note..." :
+              isTranscribing ? "Transcribing..." :
+                disabled ? "Please wait..." :
+                  "Type a message or paste text..."
           }
-          rows={1}
           className={cn(
-            'w-full resize-none bg-transparent px-4 pt-3 pb-1 text-sm text-text-primary',
-            'placeholder:text-text-muted outline-none leading-relaxed',
-            'min-h-[44px] max-h-[160px]'
+            'w-full max-h-32 min-h-[44px] bg-transparent resize-none p-3',
+            'text-sm text-text-primary placeholder:text-text-muted',
+            'focus:outline-none focus:ring-0',
+            // Add a visual cue that it's disabled
+            (disabled || isRecording || isTranscribing) && 'opacity-50 cursor-not-allowed'
           )}
+          rows={1}
+          style={{ overflowY: 'auto' }}
         />
 
         {/* Toolbar — two dropdowns + voice + send */}
