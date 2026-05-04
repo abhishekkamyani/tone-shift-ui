@@ -20,8 +20,6 @@ const WELCOME_PROMPTS = [
 
 export function ChatArea({ messages, isTyping, streamingMessageId, className }: ChatAreaProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
-  console.log("messages", messages)
-  
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });

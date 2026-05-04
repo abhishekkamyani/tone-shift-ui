@@ -47,9 +47,9 @@ export function ChatMessage({ message, isStreaming = false }: ChatMessageProps) 
             </div>
           )}
 
-          {isStreaming && (
+          {/* {isStreaming && (
             <span className="inline-block w-0.5 h-4 bg-primary-400 ml-0.5 animate-pulse align-middle" />
-          )}
+          )} */}
         </div>
 
         {/* Footer */}

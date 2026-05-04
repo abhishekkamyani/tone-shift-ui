@@ -8,6 +8,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from '@/components/ThemeToggle/ThemeToggle';
+import { useAuth0 } from '@auth0/auth0-react';
+import { useCallback } from 'react';
+import { toast } from 'sonner';
 
 export interface ChatSession {
   id: string;
@@ -22,7 +25,6 @@ interface SidebarProps {
   activeSessionId: string | null;
   onNewChat: () => void;
   onSelectSession: (id: string) => void;
-  onLogout: () => void;
   isOpen: boolean;
   onClose: () => void;
   userEmail?: string;
@@ -33,11 +35,19 @@ export function Sidebar({
   activeSessionId,
   onNewChat,
   onSelectSession,
-  onLogout,
   isOpen,
   onClose,
   userEmail,
 }: SidebarProps) {
+  const { logout } = useAuth0();
+  const handleLogout = useCallback(() => {
+    toast.success('Logging out...');
+    logout({ 
+      logoutParams: { 
+        returnTo: window.location.origin // Redirects back to your home/login page
+      } 
+    });
+  }, [logout]);
   return (
     <>
       {/* Mobile overlay */}
@@ -139,7 +149,7 @@ export function Sidebar({
           )}
 
           <button
-            onClick={onLogout}
+            onClick={handleLogout}
             className={cn(
               'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm',
               'text-text-secondary hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/20',

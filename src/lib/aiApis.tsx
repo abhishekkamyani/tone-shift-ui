@@ -54,7 +54,6 @@ const apiClient = axios.create({
 
 // Create a variable to hold the token-fetching function
 let getAuthToken: (() => Promise<string | undefined>) | null = null;
-console.log("getAuthToken", getAuthToken)
 // Export a function so your React app can give Axios the Auth0 getter
 export const setTokenGetter = (getter: () => Promise<string | undefined>) => {
     getAuthToken = getter;
@@ -63,12 +62,10 @@ export const setTokenGetter = (getter: () => Promise<string | undefined>) => {
 // Add an interceptor to automatically attach the token before EVERY request
 apiClient.interceptors.request.use(
     async (config) => {
-        console.log("==getAuthToken==", getAuthToken)
         if (getAuthToken) {
             try {
                 // Fetch the token (Auth0 handles caching and refreshing automatically!)
                 const token = await getAuthToken();
-                console.log("token", token)
                 if (token) {
                     config.headers.Authorization = `Bearer ${token}`;
                 }
@@ -111,7 +108,6 @@ export const shiftTextTone = async (payload: ShiftTonePayload): Promise<ShiftTon
 
 // Add this below your existing shiftTextTone function
 export const transcribeVoiceNote = async (payload: TranscribePayload): Promise<TranscribeResponse> => {
-    console.log("payload", payload)
     const response = await apiClient.post<TranscribeResponse>('/ai/transcribe', payload);
     return response.data;
 };
