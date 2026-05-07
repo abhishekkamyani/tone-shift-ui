@@ -10,7 +10,7 @@ export function AuthCard({ onLogin, loading = false }: AuthCardProps) {
   return (
     <div className={cn(
       'w-full max-w-sm mx-auto',
-      'bg-background-surface border border-border rounded-2xl p-8',
+      'bg-background-surface border border-gray-300 dark:border-gray-700 rounded-2xl p-8',
       'flex flex-col items-center gap-6'
     )}>
       {/* Logo */}

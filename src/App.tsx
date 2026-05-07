@@ -3,7 +3,8 @@ import { AppRoutes } from './router';
 import { ThemeProvider } from './context/ThemeContext';
 import { Toaster } from 'sonner';
 import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
-import { MailCheck, LogIn, AlertCircle } from 'lucide-react';
+import { MailCheck, LogIn, AlertCircle} from 'lucide-react';
+import { Loader } from './components/Loader/Loader';
 
 // 1. Create a Wrapper to intercept Auth0 states
 function AuthWrapper({ children }: { children: React.ReactNode }) {
@@ -11,7 +12,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 
   // Show a simple loading state while Auth0 initializes
   if (isLoading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center text-text-primary font-medium">Loading...</div>;
+    return <Loader label="Loading..." />;
   }
 
   // Intercept Auth0 Errors

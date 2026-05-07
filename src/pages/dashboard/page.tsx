@@ -12,6 +12,7 @@ import type { Message } from '@/components/ChatMessage/ChatMessage';
 import { useAuthSync } from '@/hooks/useAuthSync';
 import { withAuthenticationRequired } from '@auth0/auth0-react';
 import { useParams, useNavigate } from 'react-router-dom'; // <-- NEW IMPORTS
+import { Loader } from '@/components/Loader/Loader';
 
 function DashboardPage() {
   const isMobile = useMobile();
@@ -200,7 +201,7 @@ function DashboardPage() {
     active: chat._id === activeChatId
   })), [chats, activeChatId]);
 
-  if (!dbUser) return <div className="flex h-screen items-center justify-center">Loading your profile...</div>;
+  if (!dbUser) return <Loader label="Loading your profile..." />;
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
