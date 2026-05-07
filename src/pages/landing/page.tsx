@@ -1,4 +1,4 @@
-import { ArrowRight, Sparkles, Zap, Mic, Palette, Shield } from 'lucide-react';
+import { ArrowRight, Sparkles, Zap, Mic, Palette, Shield, Github, Linkedin } from 'lucide-react';
 import { useState } from 'react';
 import { AuthCard } from '@/components/Auth/AuthCard';
 import { ThemeToggle } from '@/components/ThemeToggle/ThemeToggle';
@@ -56,8 +56,9 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Navbar */}
-      <nav className="fixed top-0 inset-x-0 z-50 transition-all duration-300">
+      {/* --- STICKY NAVBAR --- */}
+      {/* Kept your original structure, added sticky top, glass effect, and border-b */}
+      <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border/50 transition-all duration-300">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 flex items-center justify-center rounded-xl bg-gradient-to-br from-primary-500 to-secondary-500">
@@ -77,9 +78,8 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero */}
+      {/* Hero - PRESERVED ORIGINAL UI */}
       <section className="relative flex-1 flex items-center justify-center pt-24 pb-16 px-6 overflow-hidden">
-        {/* Background blobs */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full bg-primary-500/10 blur-3xl" />
           <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full bg-secondary-500/10 blur-3xl" />
@@ -87,9 +87,7 @@ export default function LandingPage() {
         </div>
 
         <div className="relative z-10 max-w-6xl mx-auto w-full grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left: copy */}
           <div className="flex flex-col gap-6 animate-fade-in">
-            {/* Badge */}
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-primary-300/40 bg-primary-500/10 text-primary-600 dark:text-primary-300 text-xs font-medium w-fit">
               <Sparkles size={12} />
               <span>AI-Powered Chat Interface</span>
@@ -106,7 +104,6 @@ export default function LandingPage() {
               casual chats, creative brainstorms, or empathetic support. All in one place.
             </p>
 
-            {/* Tone pills */}
             <div className="flex flex-wrap gap-2">
               {TONES.map(tone => (
                 <span
@@ -141,14 +138,13 @@ export default function LandingPage() {
             </div>
           </div>
 
-          {/* Right: Auth card */}
           <div className="flex justify-center lg:justify-end animate-slide-up">
             <AuthCard onLogin={handleLogin} loading={loginLoading} />
           </div>
         </div>
       </section>
 
-      {/* Features */}
+      {/* Features - PRESERVED ORIGINAL UI */}
       <section className="py-20 px-6 bg-background-surface border-t border-border">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
@@ -179,7 +175,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CTA Banner */}
+      {/* CTA Banner - PRESERVED ORIGINAL UI */}
       <section className="py-16 px-6">
         <div className="max-w-2xl mx-auto text-center">
           <div className="p-8 rounded-2xl bg-gradient-to-br from-primary-600 to-secondary-600 text-white">
@@ -198,18 +194,54 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-border bg-background-elevated py-6 px-6">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 flex items-center justify-center rounded-md bg-gradient-to-br from-primary-500 to-secondary-500">
-              <Sparkles size={10} className="text-white" />
+      {/* --- IMPROVED STICKY FOOTER --- */}
+      {/* Made sticky at the bottom with a modern multi-section layout and your details */}
+      <footer className="sticky bottom-0 z-40 border-t border-border bg-background/90 backdrop-blur-md py-6 px-6">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          
+          {/* Brand & Owner */}
+          <div className="flex flex-col items-center md:items-start gap-1">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 flex items-center justify-center rounded-md bg-gradient-to-br from-primary-500 to-secondary-500">
+                <Sparkles size={10} className="text-white" />
+              </div>
+              <span className="text-sm font-semibold text-text-primary">ToneShift AI</span>
             </div>
-            <span className="text-sm font-semibold text-text-primary">ToneShift</span>
+            <p className="text-[10px] text-text-muted dark:text-gray-300">
+              Developed by{" "}
+              <a 
+                href="https://www.linkedin.com/in/abhishekkamyani" 
+                target="_blank" 
+                className="font-medium text-primary-500 dark:text-primary-300 hover:underline"
+              >
+                Abhishek Kamyani
+              </a>
+            </p>
           </div>
-          <p className="text-xs text-text-muted">
-            © {new Date().getFullYear()} ToneShift. Built with AI.
-          </p>
+
+          {/* Center: Tech Badge */}
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-text-primary/5 border border-border">
+            <div className="w-1.5 h-1.5 rounded-full bg-success-500 animate-pulse" />
+            <span className="text-[10px] font-bold text-text-muted dark:text-gray-300 uppercase tracking-wider">
+              Powered by Groq & Llama 3.1
+            </span>
+          </div>
+
+          {/* Socials & Copyright */}
+          <div className="flex flex-col items-center md:items-end gap-2">
+            <div className="flex items-center gap-4 text-text-muted dark:text-gray-300">
+              <a href="https://github.com/AbhishekKamyani" target="_blank" className="hover:text-text-primary transition-colors">
+                <Github size={16} />
+              </a>
+              <a href="https://www.linkedin.com/in/abhishekkamyani" target="_blank" className="hover:text-text-primary transition-colors">
+                <Linkedin size={16} />
+              </a>
+            </div>
+            <p className="text-[10px] text-text-muted dark:text-gray-300 font-medium">
+              © {new Date().getFullYear()} ToneShift. All rights reserved.
+            </p>
+          </div>
+
         </div>
       </footer>
     </div>

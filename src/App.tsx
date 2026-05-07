@@ -3,7 +3,8 @@ import { AppRoutes } from './router';
 import { ThemeProvider } from './context/ThemeContext';
 import { Toaster } from 'sonner';
 import { Auth0Provider, useAuth0 } from '@auth0/auth0-react';
-import { MailCheck, LogIn, AlertCircle } from 'lucide-react';
+import { MailCheck, LogIn, AlertCircle} from 'lucide-react';
+import { Loader } from './components/Loader/Loader';
 
 // 1. Create a Wrapper to intercept Auth0 states
 function AuthWrapper({ children }: { children: React.ReactNode }) {
@@ -11,7 +12,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
 
   // Show a simple loading state while Auth0 initializes
   if (isLoading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center text-text-primary font-medium">Loading...</div>;
+    return <Loader label="Loading..." />;
   }
 
   // Intercept Auth0 Errors
@@ -22,7 +23,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 text-center">
         <div className="max-w-md w-full bg-background-surface border border-border rounded-2xl p-8 flex flex-col items-center gap-5 shadow-lg">
-          
+
           <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-2 ${isVerificationError ? 'bg-primary-500/10' : 'bg-red-500/10'}`}>
             {isVerificationError ? (
               <MailCheck className="text-primary-500" size={28} />
@@ -30,11 +31,11 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
               <AlertCircle className="text-red-500" size={28} />
             )}
           </div>
-          
+
           <h1 className="text-2xl font-bold text-text-primary">
             {isVerificationError ? 'Verify Your Email' : 'Authentication Error'}
           </h1>
-          
+
           {isVerificationError ? (
             // Step-by-step instructions for the user
             <div className="w-full bg-background p-5 rounded-xl border border-border text-left">
@@ -52,7 +53,7 @@ function AuthWrapper({ children }: { children: React.ReactNode }) {
               {error.message}
             </p>
           )}
-          
+
           <button
             // We still call logout to clear the blocked session so they can log in fresh!
             onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
@@ -84,7 +85,7 @@ function App() {
         clientId={import.meta.env.VITE_AUTH0_CLIENT_ID}
         authorizationParams={{
           redirect_uri: window.location.origin + '/dashboard',
-          audience: import.meta.env.VITE_AUTH0_AUDIENCE 
+          audience: import.meta.env.VITE_AUTH0_AUDIENCE
         }}
       >
         <AuthWrapper>
